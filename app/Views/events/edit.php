@@ -1,120 +1,62 @@
-<!DOCTYPE html>
-<html lang="pt-br">
+<?= $this->extend('layouts/main') ?>
+<?= $this->section('content') ?>
 
-<head>
-    <meta charset="UTF-8">
-    <title>Editar Evento: <?= esc($event['title']) ?></title>
-    <style>
-        body {
-            font-family: sans-serif;
-            margin: 20px;
-        }
+<div class="container mt-5">
 
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-        }
+    <h1>✏️ Editar Evento: <?= esc($event['name'] ?? $event['title'] ?? 'Evento sem Título') ?></h1>
 
-        h1 {
-            color: #333;
-        }
+    <?php if (session()->getFlashdata('errors')): ?>
+        <ul class="alert alert-danger" style="list-style-type: none;">
+            <?php foreach (session()->getFlashdata('errors') as $error): ?>
+                <li><?= esc($error) ?></li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
 
-        label {
-            display: block;
-            margin-top: 10px;
-            font-weight: bold;
-        }
+    <form action="<?= url_to('Events::update', $event['id']) ?>" method="post">
+        <?= csrf_field() ?>
 
-        input[type="text"],
-        input[type="datetime-local"],
-        textarea {
-            width: 100%;
-            padding: 8px;
-            margin-top: 5px;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
+        <input type="hidden" name="_method" value="PUT">
 
-        textarea {
-            resize: vertical;
-        }
+        <div class="mb-3">
+            <label for="title" class="form-label">Título do Evento <span style="color:red;">*</span></label>
+            <input type="text" id="title" name="title" class="form-control"
+                value="<?= old('title', $event['name'] ?? $event['title'] ?? '') ?>" required>
+            <?php if (session('errors.title')): ?><p class="error-message text-danger"><?= session('errors.title') ?></p><?php endif; ?>
+        </div>
 
-        .btn {
-            padding: 10px 15px;
-            text-decoration: none;
-            border-radius: 4px;
-            display: inline-block;
-            margin-top: 20px;
-            cursor: pointer;
-            border: none;
-        }
+        <div class="mb-3">
+            <label for="description" class="form-label">Descrição</label>
+            <textarea id="description" name="description" class="form-control"><?= old('description', $event['description'] ?? '') ?></textarea>
+        </div>
 
-        .btn-success {
-            background-color: #28a745;
-            color: white;
-        }
+        <div class="mb-3">
+            <label for="start_time" class="form-label">Data e Hora de Início <span style="color:red;">*</span></label>
+            <input type="datetime-local" id="start_time" name="start_time" class="form-control"
+                value="<?= old('start_time', $event['start_time']) ?>" required>
+            <?php if (session('errors.start_time')): ?><p class="error-message text-danger"><?= session('errors.start_time') ?></p><?php endif; ?>
+        </div>
 
-        .btn-secondary {
-            background-color: #6c757d;
-            color: white;
-            margin-left: 10px;
-        }
+        <div class="mb-3">
+            <label for="end_time" class="form-label">Data e Hora de Fim</label>
+            <input type="datetime-local" id="end_time" name="end_time" class="form-control"
+                value="<?= old('end_time', $event['end_time'] ?? '') ?>">
+            <?php if (session('errors.end_time')): ?><p class="error-message text-danger"><?= session('errors.end_time') ?></p><?php endif; ?>
+        </div>
 
-        .error-message {
-            color: red;
-            font-size: 0.9em;
-            margin-top: 5px;
-        }
-    </style>
-</head>
+        <div class="mb-3">
+            <label for="status" class="form-label">Status</label>
+            <select id="status" name="status" class="form-control">
+                <option value="pendente" <?= old('status', $event['status'] ?? '') == 'pendente' ? 'selected' : '' ?>>Pendente</option>
+                <option value="concluída" <?= old('status', $event['status'] ?? '') == 'concluída' ? 'selected' : '' ?>>Concluída</option>
+                <option value="cancelada" <?= old('status', $event['status'] ?? '') == 'cancelada' ? 'selected' : '' ?>>Cancelada</option>
+            </select>
+        </div>
 
-<body>
 
-    <div class="container">
-        <h1>✏️ Editar Evento: <?= esc($event['title']) ?></h1>
+        <button type="submit" class="btn btn-success">Salvar Alterações</button>
+        <a href="<?= url_to('Events::show', $event['id']) ?>" class="btn btn-secondary">Cancelar e Voltar</a>
+    </form>
+</div>
 
-        <?php if (session()->getFlashdata('errors')): ?>
-            <ul style="color: red; padding: 10px; border: 1px solid red; list-style-type: none;">
-                <?php foreach (session()->getFlashdata('errors') as $error): ?>
-                    <li><?= esc($error) ?></li>
-                <?php endforeach; ?>
-            </ul>
-        <?php endif; ?>
-
-        <form action="<?= url_to('Events::update', $event['id']) ?>" method="post">
-            <?= csrf_field() ?>
-
-            <input type="hidden" name="_method" value="PUT">
-
-            <div>
-                <label for="title">Título do Evento <span style="color:red;">*</span></label>
-                <input type="text" id="title" name="title" value="<?= old('title', $event['title']) ?>" required>
-            </div>
-
-            <div>
-                <label for="description">Descrição</label>
-                <textarea id="description" name="description"><?= old('description', $event['description']) ?></textarea>
-            </div>
-
-            <div>
-                <label for="start_time">Data e Hora de Início <span style="color:red;">*</span></label>
-                <input type="datetime-local" id="start_time" name="start_time" value="<?= old('start_time', $event['start_time']) ?>" required>
-            </div>
-
-            <div>
-                <label for="end_time">Data e Hora de Fim</label>
-                <input type="datetime-local" id="end_time" name="end_time" value="<?= old('end_time', $event['end_time']) ?>">
-            </div>
-
-            <button type="submit" class="btn btn-success">Salvar Alterações</button>
-            <a href="<?= url_to('Events::show', $event['id']) ?>" class="btn btn-secondary">Cancelar e Voltar</a>
-        </form>
-    </div>
-
-</body>
-
-</html>
+<?= $this->endSection() ?>

@@ -12,39 +12,46 @@ class EventModel extends Model
     // Define a chave primária da tabela
     protected $primaryKey = 'id';
 
-    // Define que o campo id é auto-incremento (já configurado na migration)
+    // Define que o campo id é auto-incremento
     protected $useAutoIncrement = true;
 
-    // Define o tipo de retorno padrão para métodos find (array é o padrão)
+    // Define o tipo de retorno padrão
     protected $returnType = 'array';
 
-    // Desabilitamos o Soft Deletes pois não criamos a coluna deleted_at na migration
+    // Desabilitamos o Soft Deletes
     protected $useSoftDeletes = false;
 
+    public function __construct()
+    {
+        parent::__construct();
+        // Manter o construtor customizado para evitar problemas de conexão
+        $this->db = \Config\Database::connect();
+    }
+
     // Campos que podem ser manipulados (inseridos/atualizados)
-    // Corresponde às colunas da sua tabela 'events', exceto 'id' e timestamps
     protected $allowedFields = [
-        'title',
+        'user_id',    // Chave estrangeira (relacionamento)
+        'title',      // Campo do formulário (que renomeamos para 'name' no Controller)
         'description',
         'start_time',
         'end_time',
+        'status'      // <--- CORRIGIDO: Necessário para salvar o status padrão
     ];
 
+
     // Dates
-    // Ativa os timestamps, pois a tabela possui as colunas created_at e updated_at
     protected $useTimestamps = true;
     protected $dateFormat = 'datetime';
     protected $createdField = 'created_at';
     protected $updatedField = 'updated_at';
-    protected $deletedField = 'deleted_at'; // Mantemos, mas useSoftDeletes é false
+    protected $deletedField = 'deleted_at';
 
-    // Validation (Você pode adicionar regras de validação aqui mais tarde)
+    // ... (O restante das propriedades de validação e callbacks) ...
+
     protected $validationRules = [];
     protected $validationMessages = [];
     protected $skipValidation = false;
     protected $cleanValidationRules = true;
-
-    // Outras configurações (mantidas como padrão ou desabilitadas)
     protected $protectFields = true;
     protected bool $allowEmptyInserts = false;
     protected bool $updateOnlyChanged = true;

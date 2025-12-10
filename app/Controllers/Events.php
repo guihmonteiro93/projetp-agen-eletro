@@ -18,60 +18,92 @@ class Events extends BaseController
         $this->eventModel = new EventModel();
     }
 
-    // Função auxiliar para converter strings de data/hora (principalmente do input datetime-local)
+    // Função auxiliar para converter strings de data/hora
     private function _formatDateForDatabase($dateString)
     {
         if (empty($dateString)) {
             return null;
         }
 
-        // Normalizar o formato do input datetime-local: YYYY-MM-DDTHH:MM
-
-        // 1. Remove o 'T' e adiciona espaço
         $formattedDate = str_replace('T', ' ', trim($dateString));
 
-        // 2. Adiciona segundos ':00' se não houver segundos (pois o input só vai até minutos)
         if (substr_count($formattedDate, ':') === 1) {
             $formattedDate .= ':00';
         }
 
-        // Tenta criar um objeto DateTime no formato correto para garantir a limpeza
         $dateTime = \DateTime::createFromFormat('Y-m-d H:i:s', $formattedDate);
 
         if ($dateTime instanceof \DateTime) {
             return $dateTime->format('Y-m-d H:i:s');
         }
 
-        // Se falhar (o que é raro se o seletor foi usado), retornamos null para falhar o 'required'
         return null;
     }
 
 
     /**
-     * Lista todos os eventos (Página principal da agenda)
+     * Lista todos os eventos DO USUÁRIO LOGADO (Página principal da agenda)
      */
     public function index()
     {
-        // Obtém todos os eventos do banco de dados
-        $data['events'] = $this->eventModel->findAll();
+        $userId = session()->get('id');
 
-        // Carrega a view para exibir a lista de eventos
+        $data['events'] = $this->eventModel
+            ->builder()
+            ->where('user_id', $userId)
+            ->get()
+            ->getResultArray();
+
         return view('events/index', $data);
     }
 
+    // --------------------------------------------------------------------
+    // NOVO: Função para fornecer dados JSON ao FullCalendar
+    // --------------------------------------------------------------------
+
     /**
-     * Exibe os detalhes de um evento específico
-     * @param int|null $id ID do evento
+     * Fornece os eventos do usuário logado em formato JSON para o FullCalendar.
      */
-    public function show($id = null)
+    public function getEventsJson()
     {
-        if (is_null($id) || ! $data['event'] = $this->eventModel->find($id)) {
-            // Se o ID for nulo ou o evento não for encontrado, redireciona ou mostra erro
-            return redirect()->back()->with('error', 'Evento não encontrado.');
+        $userId = session()->get('id');
+        $events = $this->eventModel->where('user_id', $userId)->findAll();
+        $calendarData = [];
+
+        foreach ($events as $event) {
+            $calendarData[] = [
+                'title' => $event['name'] ?? $event['title'], // Usa 'name' ou 'title' como fallback
+                'start' => $event['start_time'],
+                'end' => $event['end_time'],
+                'id' => $event['id'],
+                'className' => $this->getStatusClass($event['status']),
+                'url' => base_url('events/' . $event['id']),
+            ];
         }
 
-        return view('events/show', $data);
+        return $this->response->setJSON($calendarData);
     }
+
+    /**
+     * Função auxiliar para mapear status do DB para classes CSS
+     */
+    private function getStatusClass($status)
+    {
+        switch ($status) {
+            case 'concluída':
+                return 'event-completed';
+            case 'cancelada':
+            case 'cancelado':
+                return 'event-cancelled';
+            case 'pendente':
+            default:
+                return 'event-pending';
+        }
+    }
+
+    // --------------------------------------------------------------------
+    // CRUD: CREATE
+    // --------------------------------------------------------------------
 
     /**
      * Exibe o formulário para criar um novo evento
@@ -86,41 +118,66 @@ class Events extends BaseController
      */
     public function create()
     {
-        // 1. Coleta os dados do formulário
-        $data = $this->request->getPost();
+        $userId = session()->get('id');
+        $input = $this->request->getPost();
 
-        // 2. Formata as datas (necessário para o MySQL/MariaDB)
-        $data['start_time'] = $this->_formatDateForDatabase($data['start_time']);
-        $data['end_time'] = $this->_formatDateForDatabase($data['end_time']);
-
-        // 3. Valida os dados (REMOVEU-SE o 'valid_date' estrito para resolver o erro)
+        // 1. Validação: Agora validamos o campo 'title' que vem do formulário
         if (! $this->validate([
-            'title' => 'required|min_length[3]',
-            'start_time' => 'required', // Apenas checa se está preenchido
+            'title' => 'required|min_length[3]', // <-- VAI PROCURAR O CAMPO 'title'
+            'start_time' => 'required',
         ])) {
-            // Se a validação falhar, retorna ao formulário com erros
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
 
-        // 4. Salva os dados no banco de dados usando o Model
+        // 2. Monta o array de dados para Inserção
+        $data = [
+            'user_id' => $userId,
+            'name' => $input['title'], // <-- RENOMEIA DE 'title' PARA 'name' AQUI
+            'description' => $input['description'] ?? null,
+            'start_time' => $this->_formatDateForDatabase($input['start_time']),
+            'end_time' => $this->_formatDateForDatabase($input['end_time'] ?? null),
+            'status' => 'pendente',
+        ];
+
+        // 3. Salva no banco de dados
         if ($this->eventModel->insert($data)) {
-            return redirect()->to('/events')->with('success', 'Evento criado com sucesso.');
+            return redirect()->to('/events')->with('success', 'Evento criado com sucesso!');
         } else {
             return redirect()->back()->with('error', 'Erro ao salvar o evento.');
         }
     }
 
+    // --------------------------------------------------------------------
+    // CRUD: SHOW, EDIT, UPDATE, DELETE (Mantidos com autorização)
+    // --------------------------------------------------------------------
+
+    /**
+     * Exibe os detalhes de um evento específico
+     */
+    public function show($id = null)
+    {
+        if (is_null($id) || ! $data['event'] = $this->eventModel->find($id)) {
+            return redirect()->to('/events')->with('error', 'Evento não encontrado.');
+        }
+        if ($data['event']['user_id'] != session()->get('id')) {
+            return redirect()->to('/events')->with('error', 'Acesso negado: Este evento não é seu.');
+        }
+        return view('events/show', $data);
+    }
+
     /**
      * Exibe o formulário de edição de um evento existente
-     * @param int|null $id ID do evento
      */
     public function edit($id = null)
     {
         if (is_null($id) || ! $data['event'] = $this->eventModel->find($id)) {
-            return redirect()->back()->with('error', 'Evento não encontrado.');
+            return redirect()->to('/events')->with('error', 'Evento não encontrado.');
+        }
+        if ($data['event']['user_id'] != session()->get('id')) {
+            return redirect()->to('/events')->with('error', 'Você só pode editar seus próprios eventos.');
         }
 
-        // Formata a data para exibir no campo datetime-local (necessário T)
+        // Formata a data para exibir no campo datetime-local
         if (!empty($data['event']['start_time'])) {
             $data['event']['start_time'] = str_replace(' ', 'T', substr($data['event']['start_time'], 0, 16));
         }
@@ -133,26 +190,36 @@ class Events extends BaseController
 
     /**
      * Processa a submissão do formulário e atualiza o evento
-     * @param int $id ID do evento a ser atualizado
      */
     public function update($id)
     {
-        // 1. Coleta os dados e valida
-        $data = $this->request->getPost();
+        if (is_null($id) || ! $event = $this->eventModel->find($id)) {
+            return redirect()->to('/events')->with('error', 'Evento não encontrado.');
+        }
+        if ($event['user_id'] != session()->get('id')) {
+            return redirect()->to('/events')->with('error', 'Você só pode editar seus próprios eventos.');
+        }
 
-        // 2. Formata as datas
-        $data['start_time'] = $this->_formatDateForDatabase($data['start_time']);
-        $data['end_time'] = $this->_formatDateForDatabase($data['end_time']);
+        $input = $this->request->getPost();
 
-        // 3. Valida os dados (REMOVEU-SE o 'valid_date' estrito)
+        // Validação
         if (! $this->validate([
             'title' => 'required|min_length[3]',
-            'start_time' => 'required', // Apenas checa se está preenchido
+            'start_time' => 'required',
         ])) {
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
 
-        // 4. Atualiza os dados no banco
+        // Monta o array de atualização
+        $data = [
+            'name' => $input['title'],
+            'description' => $input['description'] ?? null,
+            'start_time' => $this->_formatDateForDatabase($input['start_time']),
+            'end_time' => $this->_formatDateForDatabase($input['end_time'] ?? null),
+            'status' => $input['status'] ?? $event['status'],
+        ];
+
+        // 6. Atualiza os dados no banco
         if ($this->eventModel->update($id, $data)) {
             return redirect()->to('/events')->with('success', 'Evento atualizado com sucesso.');
         } else {
@@ -162,14 +229,20 @@ class Events extends BaseController
 
     /**
      * Exclui um evento
-     * @param int $id ID do evento a ser excluído
      */
     public function delete($id)
     {
+        if (is_null($id) || ! $event = $this->eventModel->find($id)) {
+            return redirect()->to('/events')->with('error', 'Evento não encontrado.');
+        }
+        if ($event['user_id'] != session()->get('id')) {
+            return redirect()->to('/events')->with('error', 'Você só pode excluir seus próprios eventos.');
+        }
+
         if ($this->eventModel->delete($id)) {
             return redirect()->to('/events')->with('success', 'Evento excluído com sucesso.');
         } else {
-            return redirect()->back()->with('error', 'Erro ao excluir o evento.');
+            return redirect()->to('/events')->with('error', 'Erro ao excluir o evento.');
         }
     }
 }

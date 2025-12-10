@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Detalhes do Evento: <?= esc($event['title']) ?></title>
+    <title>Detalhes do Evento: <?= esc($event['name'] ?? $event['title'] ?? 'Evento sem Título') ?></title>
     <style>
         body {
             font-family: sans-serif;
@@ -20,18 +20,18 @@
 
         h1 {
             color: #333;
-            border-bottom: 2px solid #ccc;
+            border-bottom: 2px solid #eee;
             padding-bottom: 10px;
         }
 
-        .detail-item {
+        p {
             margin-bottom: 15px;
         }
 
-        .detail-item strong {
+        .info-label {
+            font-weight: bold;
             display: inline-block;
             width: 150px;
-            font-weight: bold;
         }
 
         .btn {
@@ -39,12 +39,7 @@
             text-decoration: none;
             border-radius: 4px;
             display: inline-block;
-            margin: 5px 0;
-        }
-
-        .btn-secondary {
-            background-color: #6c757d;
-            color: white;
+            margin-top: 20px;
         }
 
         .btn-primary {
@@ -62,48 +57,35 @@
 </head>
 
 <body>
-
     <div class="container">
-        <h1>Detalhes do Evento: <?= esc($event['title']) ?></h1>
+        <h1>Detalhes do Evento: <?= esc($event['name'] ?? $event['title']) ?></h1>
 
-        <div class="detail-item">
-            <strong>Título:</strong>
-            <span><?= esc($event['title']) ?></span>
-        </div>
+        <p><span class="info-label">ID:</span> <?= esc($event['id']) ?></p>
 
-        <div class="detail-item">
-            <strong>Descrição:</strong>
-            <span><?= esc($event['description']) ?: 'Nenhuma descrição fornecida.' ?></span>
-        </div>
+        <p><span class="info-label">Descrição:</span> <?= nl2br(esc($event['description'] ?? 'Sem descrição.')) ?></p>
 
-        <div class="detail-item">
-            <strong>Início:</strong>
-            <span><?= esc($event['start_time']) ?></span>
-        </div>
+        <p><span class="info-label">Início:</span> <?= esc($event['start_time']) ?></p>
 
-        <div class="detail-item">
-            <strong>Fim:</strong>
-            <span><?= esc($event['end_time']) ?: 'Não especificado.' ?></span>
-        </div>
+        <p><span class="info-label">Fim:</span> <?= esc($event['end_time'] ?? 'Não definido') ?></p>
 
-        <div class="detail-item">
-            <strong>Criado em:</strong>
-            <span><?= esc($event['created_at']) ?></span>
-        </div>
+        <p><span class="info-label">Status:</span> <?= esc($event['status'] ?? 'Não definido') ?></p>
+
+        <p><span class="info-label">Criado em:</span> <?= esc($event['created_at']) ?></p>
+
+        <p><span class="info-label">Atualizado em:</span> <?= esc($event['updated_at']) ?></p>
 
         <hr>
 
-        <a href="<?= url_to('Events::index') ?>" class="btn btn-secondary">← Voltar à Lista</a>
-
-        <a href="<?= url_to('Events::edit', $event['id']) ?>" class="btn btn-primary">✏️ Editar</a>
+        <a href="<?= url_to('Events::edit', $event['id']) ?>" class="btn btn-primary">Editar</a>
 
         <form action="<?= url_to('Events::delete', $event['id']) ?>" method="post" style="display: inline-block;">
             <?= csrf_field() ?>
             <input type="hidden" name="_method" value="DELETE">
-            <button type="submit" class="btn btn-danger" onclick="return confirm('Tem certeza que deseja excluir este evento?');">🗑️ Excluir</button>
+            <button type="submit" class="btn btn-danger" onclick="return confirm('Tem certeza que deseja excluir este evento?');">Excluir</button>
         </form>
-    </div>
 
+        <a href="<?= url_to('Events::index') ?>" class="btn btn-secondary" style="margin-left: 10px;">Voltar para Agenda</a>
+    </div>
 </body>
 
 </html>
